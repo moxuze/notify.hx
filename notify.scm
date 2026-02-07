@@ -4,7 +4,7 @@
 (require "helix/misc.scm")
 (require "helix/editor.scm")
 
-(provide notify notify-focus-first)
+(provide notify notify-focus-first notify-config)
 
 
 (define MIN-WIDTH 20)
@@ -14,6 +14,15 @@
 (define WARNING-ICON "")
 (define INFO-ICON    "")
 
+; Internal config state with default parameters
+(define *notify-config* (hash 'render 'default))
+
+; Public set-config function
+(define (notify-config key value)
+  (set! *notify-config* (hash-insert *notify-config* key value)))
+
+(define (notify-config-render)
+   (hash-ref *notify-config* 'render))
 
 ; Component's local state
 ; All notifications are in *notifications-queue*
@@ -35,7 +44,9 @@
         ; If rendering function decided the notification doesn't fit the screen - it will be hidden
         hidden
         ; A flag that the notification just has been yanked. Must be #true only for single render
-        blink))
+        blink
+        ; Layout render style (could be 'default or 'minimal)
+        render))
 
 (define (get-click notification)
   (unbox (Notification-click notification)))
@@ -56,6 +67,9 @@
 
 (define (set-hidden! notification flag)
   (set-box! (Notification-hidden notification) flag))
+
+(define (minimal-render? notification)
+  (eq? (unbox (Notification-render notification)) 'minimal))
 
 (define (bg-style notification)
   (if (unbox (Notification-blink notification))
@@ -169,10 +183,10 @@
     *notifications-queue*))
 
 
-(define (notify msg #:severity [severity 'info] #:title [title ""] #:duration [duration 5000])
+(define (notify msg #:severity [severity 'info] #:title [title ""] #:duration [duration 5000] #:render [render (notify-config-render)])
   (define text (if (string? msg) msg (to-string msg)))
   (define text-lines (split-many text "\n"))
-  (define notification (Notification (get-message-id) (local-time/now! "%H:%M:%S") title text-lines severity (box #f) (box #f) (box #f) (box #f)))
+  (define notification (Notification (get-message-id) (local-time/now! "%H:%M:%S") title text-lines severity (box #f) (box #f) (box #f) (box #f) (box render)))
 
   (when (no-notifications?)
         (push-component! (new-component! COMPONENT-NAME
@@ -262,10 +276,11 @@
 (define (render-lines frame start-x start-y notification bg-style)
   (define normal-style (theme-scope *helix.cx* "normal"))
 
-  (frame-set-string! frame start-x start-y (get-header notification) (get-style notification))
-  (frame-set-string! frame start-x (+ start-y 1) "" normal-style)
-
-  (let loop ((lines (Notification-lines notification)) (y (+ start-y 2)))
+  (unless (minimal-render? notification)
+          (frame-set-string! frame start-x start-y (get-header notification) (get-style notification))
+          (frame-set-string! frame start-x (+ start-y 1) "" normal-style))
+  
+  (let loop ((lines (Notification-lines notification)) (y (if (minimal-render? notification) start-y (+ start-y 2))))
     (when (not (null? lines))
       (frame-set-string! frame start-x y (car lines) bg-style)
       (loop (cdr lines) (+ y 1)))))
@@ -281,11 +296,11 @@
 ;; `get-popup-geometry-rect` knows these attributes and can "shrink" the rectangle
 (define (get-popup-geometry notification)
   (define text-lines (Notification-lines notification))
-  (define heading (get-header notification))
+  (define heading (if (minimal-render? notification) "" (get-header notification)))
   (define line-count (length text-lines))
   (define content-width (calculate-content-width (cons heading text-lines)))
   (define final-width (+ (exact (max MIN-WIDTH content-width)) 4))
-  (define final-height (+ line-count 4))
+  (define final-height (+ line-count (if (minimal-render? notification) 2 4)))
 
   (list final-width final-height))
 

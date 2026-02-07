@@ -33,7 +33,7 @@ This plugin is intended to be used by other plugins from [Steel](https://github.
 
 (notify "This is a minimal popup with info severity")
 
-(notify "This is a warning showing some options" #:severity 'warning #:title "notify.hx demo" #:duration 10000)
+(notify "This is a warning showing some options" #:severity 'warning #:title "notify.hx demo" #:duration 10000 #:render 'default)
 
 (notify "...and an error" #:severity 'error #:title "notify.hx demo" #:duration 10000)
 
@@ -45,6 +45,23 @@ But you also can invoke it as a plain command:
 ```
 :notify "Works from here as well!"
 ```
+
+## Configuration
+
+You can configure the plugin via public `notify-config` function that can be called in `init.scm`.
+
+### Render
+
+If you want the popups to take less space you can set the `'render` option to `'minimal`:
+
+```scheme
+;; init.scm
+(require "notify/notify.scm")
+
+(notify-config 'render 'minimal)   ;; Default is 'default
+```
+
+The render can be overwritten by publisher using `#:render` keyword, it has a priority over user config.
 
 ## Why
 
